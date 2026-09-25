@@ -18,6 +18,11 @@ Last updated: 2026-09-25.
 The previews are 1280×720 at 60 fps with no audio; the client said low resolution is fine for review. The final export
 is 3840×2160 at 60 fps from the same master (`--w 3840`).
 
+A 2K version (2560×1440, 60 fps, `--w 2560`) was delivered on request: `out/seq1-7-2k60.mp4` (the whole film, CRF 16,
+38 MB) and `out/2k/seq1-2k60.mp4` to `seq7-2k60.mp4` (one clip per sequence). The Claude app only sends files up to
+30 MB, so the whole film was also re-encoded at CRF 19 as `out/seq1-7-2k60-send.mp4`. The per-sequence clips are
+first-generation renders from the master.
+
 ## System
 
 - **One master canvas:** `master.html`. World units equal the reference overview frame (1920×1080 at zoom 1).
