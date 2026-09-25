@@ -166,6 +166,12 @@ node check-seams.mjs --w 1280      # exits non-zero if any seam differs
    static after they appear; no numbers were added beyond the brief's.
 
 ## QA performed and its limits
+- The encoded 1–7 clip decodes fully: 97.02 s, 5,821 frames at 60 fps. The separate 6 and 7 clips each decode to
+  601 frames (10.02 s).
+- The 1–4 section of the new clip was compared with the original 1–4 preview every second. The largest mean
+  difference is 0.7 of 255, from text anti-aliasing and compression.
+- In the encoded clip, "INSPECTION" (frame 4,950) and "CERTIFICATE OF COMPLETION" (frame 5,490) each appear in a
+  single frame, with no change in the frames on either side. A frame sheet of 76–97 s every 0.5 s was inspected.
 - Squares 6 and 7 were rendered in a Linux container (Chromium, same master). Stills of the unchanged 1–4 section
   were compared with the Windows-rendered 1–4 preview; they differ only in text anti-aliasing and compression noise.
 - `check-seams.mjs`: all five seams (1→2, 2→3, 3→4, 4→6, 6→7) are byte-identical at 1280 wide.
