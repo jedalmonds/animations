@@ -1,0 +1,11 @@
+{
+  "name": "documentary-diagram",
+  "private": true,
+  "description": "Master canvas and renderer for the documentary budget diagram animation.",
+  "scripts": {
+    "preview": "node render.mjs --seq 1234567 --w 1280 --out out/seq1-7-preview-720p60.mp4"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

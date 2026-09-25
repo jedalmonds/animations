@@ -7,13 +7,13 @@ Last updated: 2026-09-25.
 
 | Seq | Content | Clip | Status |
 |---|---|---|---|
-| 1 | National Budget | `out/seq1-4-preview-720p60.mp4` (1–4 combined, 77.0 s) | Preview; ₱ builds itself |
+| 1 | National Budget | `out/seq1-7-preview-720p60.mp4` (1–7 combined, 97.0 s) | Preview; ₱ builds itself |
 | 2 | DPWH + District Engineering Office | same | Preview |
 | 3 | Budget Approval | same | Preview; extra elements added (now 18.5 s) |
 | 4 | Bidding + Winning Contractor | same | Preview (starts 3.5 s later on the master clock) |
 | 5 | (no sequence requested; square stays empty) | n/a | n/a |
-| 6 | Inspection | not started | Icon (`content_paste_search`) prepared |
-| 7 | Certificate of Completion | not started | Icon (`workspace_premium`) prepared |
+| 6 | Inspection | same, and `out/seq6-preview-720p60.mp4` (10.0 s) | Preview |
+| 7 | Certificate of Completion | same, and `out/seq7-preview-720p60.mp4` (10.0 s) | Preview |
 
 The previews are 1280×720 at 60 fps with no audio; the client said low resolution is fine for review. The final export
 is 3840×2160 at 60 fps from the same master (`--w 3840`).
@@ -23,17 +23,24 @@ is 3840×2160 at 60 fps from the same master (`--w 3840`).
 - **One master canvas:** `master.html`. World units equal the reference overview frame (1920×1080 at zoom 1).
   Output resolution never changes the layout.
 - **One master clock:** each clip is a window of it, so a clip's last frame is identical to the next clip's first frame.
-  Byte-identical seams checked: 1→2, 2→3 and 3→4. Combined windows: `12` (0–41.5 s), `34` (41.5–77 s) and
-  `1234` (0–77 s).
+  Byte-identical seams checked with `check-seams.mjs`: 1→2, 2→3, 3→4, 4→6 and 6→7. Combined windows: `12` (0–41.5 s),
+  `34` (41.5–77 s), `67` (77–97 s), `1234` (0–77 s) and `1234567` (0–97 s, the whole film).
+- **Frames are order-independent:** every frame is drawn from the master time alone. Before 2026-09-25 two scratch
+  layers kept line settings from the previous frame, so a clip rendered on its own started with slightly different
+  pixels than the previous clip ended with (seams 2→3 and 3→4, a pixel or so on the tile corners and the river-wall
+  joints). Those settings are now fixed to the look the preview showed, and `check-seams.mjs` draws each clip's last
+  frame after earlier frames, as a real render does, so such a leak would show up.
 - **Camera:** keyframes `[t, x, y, zoom]` with cubic ease-in-out. Zoom interpolates logarithmically. Holds are
   perfectly still, so the editor can trim them without jumps.
 - **Rendering:** `render.mjs` streams frames straight into ffmpeg with no PNGs written to disk, because drive C: is
   nearly full.
 
 ```
-node render.mjs --seq 1234 --w 1280 --out out/seq1-4-preview-720p60.mp4
-node render.mjs --seq 34 --w 3840 --out out/seq3-4-4k60.mp4
+npm install                        # puppeteer-core; point CHROME at a Chrome/Chromium binary
+node render.mjs --seq 1234567 --w 1280 --out out/seq1-7-preview-720p60.mp4
+node render.mjs --seq 6 --w 3840 --out out/seq6-4k60.mp4
 node render.mjs --seq 3 --w 1280 --stills 0,300 --out out/stills
+node check-seams.mjs --w 1280      # exits non-zero if any seam differs
 ```
 
 ## Style decisions
@@ -44,8 +51,18 @@ node render.mjs --seq 3 --w 1280 --stills 0,300 --out out/stills
   static grain, matching the reference.
 - **Ink:** #141412. Squares, arrows and outlines are 2.2 world units wide.
 - **Icons:** the ₱, DPWH emblem, list icons, task tiles and river-wall diagram are drawn in code. The handshake,
-  assignment, woman, man, home, check_circle, location_on, content_paste_search and workspace_premium icons come from Google **Material Symbols Rounded
+  assignment, woman, man, home, check_circle and location_on icons come from Google **Material Symbols Rounded
   (filled)** under the Apache 2.0 licence (`icons/LICENSE`).
+- **Squares 6 and 7 icons:** the prepared `content_paste_search` is an outline icon and `workspace_premium` reads as an
+  award badge. Next to the solid handshake and assignment icons neither matched, so both are solid composites drawn in
+  code on the same Material grid, with the same rounded ends and knockout gaps:
+  - **Inspection:** a clipboard with three ticked rows, and a magnifying glass over its lower right (the brief's
+    suggestion). The clipboard tab matches the assignment icon in square 4.
+  - **Certificate:** a certificate sheet with an inner border, text lines and a ribboned seal. The border is about
+    the same weight as the square outlines.
+
+  Both still come from `icons.js` and `master.html`, so swapping back to a Material icon is a one-line change in
+  `seq6()` or `seq7()`.
 - **DPWH emblem:** simplified black-and-white gear, road and "DPWH" band, based on the approved infographic. It is
   **not** the official seal; swap in the official black-and-white logo if supplied.
 - **Reveal grammar:**
@@ -120,6 +137,23 @@ node render.mjs --seq 3 --w 1280 --stills 0,300 --out out/stills
 | 13.6 | "WINNING CONTRACTOR" (hard cut). The other figures stay visible, with no celebration. |
 | 13.6–17.0 | Hold (final frame) |
 
+### Sequence 6: Inspection (10.0 s; master clock 77.0–87.0)
+| t | Event |
+|---|---|
+| 0–0.4 | Hold on the winning-contractor frame |
+| 0.4–4.0 | Pan up and right past the empty square 5 to square 6. This pan is longer, so its peak speed stays within that of the earlier pans. |
+| 4.3–4.9 | Inspection icon fades in and then stays still |
+| 5.5 | "INSPECTION" beneath the square (hard cut) |
+| 5.5–10.0 | Hold (final frame). No paragraph or inspection scene, per the brief. |
+
+### Sequence 7: Certificate of Completion (10.0 s; master clock 87.0–97.0)
+| t | Event |
+|---|---|
+| 0.4–3.0 | Pan right to square 7 (horizontal only) |
+| 3.3–3.9 | Certificate icon fades in and then stays still |
+| 4.5 | "CERTIFICATE OF COMPLETION" beneath the square on one line (hard cut), same size as the other step headings. It is wider than the square, like the DPWH name. |
+| 4.5–10.0 | Hold (final frame of the film). No paperwork animation or full-diagram reveal, per the brief. |
+
 ## Additions beyond the brief (client-requested "more elements", kept within the rules)
 1. The circle is drawn as a single line rather than faded in, and the pie slices fill in sequence.
 2. List items have flat icons instead of bullets. No categories were added.
@@ -132,7 +166,11 @@ node render.mjs --seq 3 --w 1280 --stills 0,300 --out out/stills
    static after they appear; no numbers were added beyond the brief's.
 
 ## QA performed and its limits
-- The encoded 1–4 clip decodes fully: 77.02 s, 4,621 frames at 60 fps.
+- Squares 6 and 7 were rendered in a Linux container (Chromium, same master). Stills of the unchanged 1–4 section
+  were compared with the Windows-rendered 1–4 preview; they differ only in text anti-aliasing and compression noise.
+- `check-seams.mjs`: all five seams (1→2, 2→3, 3→4, 4→6, 6→7) are byte-identical at 1280 wide.
+- Camera: peak screen speed per move, measured at 1920 wide, is 6–25 px per frame. The 4→6 pan peaks at 24.6 and 6→7
+  at 15.2, both within the range of the earlier pans (up to 25.2 on 2→3).
 - Stills and frame sheets (every 0.5–1 s) were inspected, along with strips of the ₱ build and the pie build.
 - A numeric camera check found no speed discontinuities.
 - **Playback was not watched directly;** the review is based on extracted frames and camera maths.
@@ -141,5 +179,5 @@ node render.mjs --seq 3 --w 1280 --stills 0,300 --out out/stills
 - Nexa font files, if Nexa should replace Montserrat.
 - An official DPWH logo (black and white), if the simplified emblem should be replaced.
 - Voiceover timings, to retime the reveals and holds.
-- Sequences 6 and 7.
+- Approval of the squares 6 and 7 icons, and of their provisional timings.
 - The final 4K export after approval.
