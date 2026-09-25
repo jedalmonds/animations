@@ -7,13 +7,13 @@ Last updated: 2026-09-25.
 
 | Seq | Content | Clip | Status |
 |---|---|---|---|
-| 1 | National Budget | `out/seq1-7-preview-720p60.mp4` (1–7 combined, 97.0 s) | Preview; ₱ builds itself |
+| 1 | National Budget | `out/seq1-7-preview-720p60.mp4` (1–7 combined, 107.0 s) | Preview; ₱ builds itself |
 | 2 | DPWH + District Engineering Office | same | Preview |
 | 3 | Budget Approval | same | Preview; extra elements added (now 18.5 s) |
 | 4 | Bidding + Winning Contractor | same | Preview (starts 3.5 s later on the master clock) |
-| 5 | (no sequence requested; square stays empty) | n/a | n/a |
-| 6 | Inspection | same, and `out/seq6-preview-720p60.mp4` (10.0 s) | Preview |
-| 7 | Certificate of Completion | same, and `out/seq7-preview-720p60.mp4` (10.0 s) | Preview |
+| 5 | Construction | same, and `out/seq5-preview-720p60.mp4` (10.0 s) | Preview; added at the client's request (the brief had left square 5 empty) |
+| 6 | Inspection | same, and `out/seq6-preview-720p60.mp4` (10.0 s) | Preview (starts 10 s later on the master clock) |
+| 7 | Certificate of Completion | same, and `out/seq7-preview-720p60.mp4` (10.0 s) | Preview (starts 10 s later on the master clock) |
 
 The previews are 1280×720 at 60 fps with no audio; the client said low resolution is fine for review. The final export
 is 3840×2160 at 60 fps from the same master (`--w 3840`).
@@ -23,8 +23,8 @@ is 3840×2160 at 60 fps from the same master (`--w 3840`).
 - **One master canvas:** `master.html`. World units equal the reference overview frame (1920×1080 at zoom 1).
   Output resolution never changes the layout.
 - **One master clock:** each clip is a window of it, so a clip's last frame is identical to the next clip's first frame.
-  Byte-identical seams checked with `check-seams.mjs`: 1→2, 2→3, 3→4, 4→6 and 6→7. Combined windows: `12` (0–41.5 s),
-  `34` (41.5–77 s), `67` (77–97 s), `1234` (0–77 s) and `1234567` (0–97 s, the whole film).
+  Byte-identical seams checked with `check-seams.mjs`: 1→2, 2→3, 3→4, 4→5, 5→6 and 6→7. Combined windows: `12`
+  (0–41.5 s), `34` (41.5–77 s), `567` (77–107 s), `1234` (0–77 s) and `1234567` (0–107 s, the whole film).
 - **Frames are order-independent:** every frame is drawn from the master time alone. Before 2026-09-25 two scratch
   layers kept line settings from the previous frame, so a clip rendered on its own started with slightly different
   pixels than the previous clip ended with (seams 2→3 and 3→4, a pixel or so on the tile corners and the river-wall
@@ -53,16 +53,19 @@ node check-seams.mjs --w 1280      # exits non-zero if any seam differs
 - **Icons:** the ₱, DPWH emblem, list icons, task tiles and river-wall diagram are drawn in code. The handshake,
   assignment, woman, man, home, check_circle and location_on icons come from Google **Material Symbols Rounded
   (filled)** under the Apache 2.0 licence (`icons/LICENSE`).
-- **Squares 6 and 7 icons:** the prepared `content_paste_search` is an outline icon and `workspace_premium` reads as an
-  award badge. Next to the solid handshake and assignment icons neither matched, so both are solid composites drawn in
-  code on the same Material grid, with the same rounded ends and knockout gaps:
+- **Squares 5, 6 and 7 icons:** the prepared `content_paste_search` is an outline icon and `workspace_premium` reads as
+  an award badge. Next to the solid handshake and assignment icons neither matched, so all three are solid composites
+  drawn in code on the same Material grid, with the same rounded ends and knockout gaps:
+  - **Construction:** a tower crane lifting a concrete panel. The mast and jib are solid bars with triangular lattice
+    openings. Material's `construction` (crossed hammer and wrench) was too thin beside the other icons, and
+    `front_loader` reads as machinery rather than building.
   - **Inspection:** a clipboard with three ticked rows, and a magnifying glass over its lower right (the brief's
     suggestion). The clipboard tab matches the assignment icon in square 4.
   - **Certificate:** a certificate sheet with an inner border, text lines and a ribboned seal. The border is about
     the same weight as the square outlines.
 
-  The prepared Material paths stay in `icons.js`, so swapping back is a one-line change in `seq6()` or `seq7()`
-  (`sym(...)` in place of `composite(...)`).
+  The prepared Material paths for 6 and 7 stay in `icons.js`, so swapping back is a one-line change in `seq6()` or
+  `seq7()` (`sym(...)` in place of `composite(...)`).
 - **DPWH emblem:** simplified black-and-white gear, road and "DPWH" band, based on the approved infographic. It is
   **not** the official seal; swap in the official black-and-white logo if supplied.
 - **Reveal grammar:**
@@ -137,16 +140,23 @@ node check-seams.mjs --w 1280      # exits non-zero if any seam differs
 | 13.6 | "WINNING CONTRACTOR" (hard cut). The other figures stay visible, with no celebration. |
 | 13.6–17.0 | Hold (final frame) |
 
-### Sequence 6: Inspection (10.0 s; master clock 77.0–87.0)
+### Sequence 5: Construction (10.0 s; master clock 77.0–87.0)
 | t | Event |
 |---|---|
 | 0–0.4 | Hold on the winning-contractor frame |
-| 0.4–4.0 | Pan up and right past the empty square 5 to square 6. This pan is longer, so its peak speed stays within that of the earlier pans. |
-| 4.3–4.9 | Inspection icon fades in and then stays still |
-| 5.5 | "INSPECTION" beneath the square (hard cut) |
-| 5.5–10.0 | Hold (final frame). No paragraph or inspection scene, per the brief. |
+| 0.4–3.1 | Pan up and right to square 5 (the same move as 3 to 4) |
+| 3.4–4.0 | Construction icon (tower crane) fades in and then stays still |
+| 4.0–10.0 | Hold (final frame). No heading beneath the square, as requested; one would go at 4.6 like "BIDDING". |
 
-### Sequence 7: Certificate of Completion (10.0 s; master clock 87.0–97.0)
+### Sequence 6: Inspection (10.0 s; master clock 87.0–97.0)
+| t | Event |
+|---|---|
+| 0.4–3.0 | Pan right to square 6 (horizontal only) |
+| 3.3–3.9 | Inspection icon fades in and then stays still |
+| 4.5 | "INSPECTION" beneath the square (hard cut) |
+| 4.5–10.0 | Hold (final frame). No paragraph or inspection scene, per the brief. |
+
+### Sequence 7: Certificate of Completion (10.0 s; master clock 97.0–107.0)
 | t | Event |
 |---|---|
 | 0.4–3.0 | Pan right to square 7 (horizontal only) |
@@ -164,6 +174,8 @@ node check-seams.mjs --w 1280      # exits non-zero if any seam differs
 6. The ₱ builds itself (trace, fill, bars) instead of fading.
 7. Sequence 3: a "PROPOSED PROJECT:" label, a location pin, and a river-wall diagram with a 220 m dimension line. All are
    static after they appear; no numbers were added beyond the brief's.
+8. Step 5: a construction sequence, requested by the client after the brief (which said to leave square 5 empty). It
+   has the icon only, with no heading or supporting text.
 
 ## QA performed and its limits
 - The encoded 1–7 clip decodes fully: 97.02 s, 5,821 frames at 60 fps. The separate 6 and 7 clips each decode to
@@ -185,5 +197,6 @@ node check-seams.mjs --w 1280      # exits non-zero if any seam differs
 - Nexa font files, if Nexa should replace Montserrat.
 - An official DPWH logo (black and white), if the simplified emblem should be replaced.
 - Voiceover timings, to retime the reveals and holds.
-- Approval of the squares 6 and 7 icons, and of their provisional timings.
+- Approval of the squares 5, 6 and 7 icons, and of their provisional timings.
+- Whether step 5 should have a heading beneath the square (for example "CONSTRUCTION"), like the other steps.
 - The final 4K export after approval.

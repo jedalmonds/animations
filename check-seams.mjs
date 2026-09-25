@@ -4,7 +4,7 @@
 // node check-seams.mjs --w 1280
 import puppeteer from 'puppeteer-core'; import path from 'node:path'; import {pathToFileURL} from 'node:url';
 const a = Object.fromEntries(process.argv.slice(2).reduce((r, v, i, x) => (v.startsWith('--') && r.push([v.slice(2), x[i + 1]]), r), []));
-const PAIRS = [[1, 2], [2, 3], [3, 4], [4, 6], [6, 7]];
+const PAIRS = [[1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7]];
 const b = await puppeteer.launch({executablePath: process.env.CHROME, headless: true, protocolTimeout: 0, args: process.getuid?.() === 0 ? ['--no-sandbox'] : []});
 async function frames(seq, which) {
   const p = await b.newPage(); p.on('pageerror', e => { console.error('PAGE', e.message); process.exit(1); });

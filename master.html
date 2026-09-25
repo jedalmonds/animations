@@ -30,11 +30,11 @@ const GREYS = ['#1b1b19', '#474641', '#72706a', '#9d9a92', '#c3c0b7', '#dcd9d0']
 
 // ---------------- master timeline (seconds) ----------------
 // Sequence windows on the master clock. Later sequences are appended here.
-// There is no sequence 5: square 5 stays empty and the camera passes it on the way from 4 to 6.
+// Sequence 5 (construction) was added at the client's request after the brief, which had left square 5 empty.
 const SEQS = {1: {start: 0, dur: 17}, 2: {start: 17, dur: 24.5}, 3: {start: 41.5, dur: 18.5}, 4: {start: 60, dur: 17},
-  6: {start: 77, dur: 10}, 7: {start: 87, dur: 10},
-  12: {start: 0, dur: 41.5}, 34: {start: 41.5, dur: 35.5}, 67: {start: 77, dur: 20},
-  1234: {start: 0, dur: 77}, 1234567: {start: 0, dur: 97}};   // combined clips
+  5: {start: 77, dur: 10}, 6: {start: 87, dur: 10}, 7: {start: 97, dur: 10},
+  12: {start: 0, dur: 41.5}, 34: {start: 41.5, dur: 35.5}, 567: {start: 77, dur: 30},
+  1234: {start: 0, dur: 77}, 1234567: {start: 0, dur: 107}};   // combined clips
 const T = {
   peso: {trace: [4.3, 4.9], fill: [4.75, 5.25], bars: [5.1, 5.45, 5.2, 5.55]},   // outline traced, ink fills bottom-up, bars drawn across
   arrow1: [9.2, 9.6],        // "large pool": arrow grows down from the square
@@ -71,12 +71,14 @@ const T = {
   men: [68.5, 69.1, 69.7], suitorLine: .45,             // each man appears, then his dashed line draws toward her
   winnerBadge: 73.3,
   winnerLabel: 73.6,
-  // ---- sequence 6 (starts 77.0 on the winning-contractor frame) ----
-  inspectIn: [81.3, 81.9],
-  inspectHead: 82.5,
-  // ---- sequence 7 (starts 87.0 on the inspection frame) ----
-  certIn: [90.3, 90.9],
-  certHead: 91.5,
+  // ---- sequence 5 (starts 77.0 on the winning-contractor frame) ----
+  constructIn: [80.4, 81.0],                            // icon only: no heading was requested for step 5
+  // ---- sequence 6 (starts 87.0 on the construction frame) ----
+  inspectIn: [90.3, 90.9],
+  inspectHead: 91.5,
+  // ---- sequence 7 (starts 97.0 on the inspection frame) ----
+  certIn: [100.3, 100.9],
+  certHead: 101.5,
 };
 const CAM = [   // [t, centreX, centreY, zoom]
   [0, 960, 540, 1],
@@ -103,9 +105,11 @@ const CAM = [   // [t, centreX, centreY, zoom]
   [65.6, sqCX(3), 377.7, 3],
   [67.4, sqCX(3), 640, 3],     // down to the suitors
   [77.4, sqCX(3), 640, 3],
-  [81.0, sqCX(5), 377.7, 3],   // past the empty square 5 to square 6: up and right, longer so peak speed matches earlier pans
-  [87.4, sqCX(5), 377.7, 3],
-  [90.0, sqCX(6), 377.7, 3],   // straight right to square 7
+  [80.1, sqCX(4), 377.7, 3],   // to square 5: up and right, same move as 3 to 4
+  [87.4, sqCX(4), 377.7, 3],
+  [90.0, sqCX(5), 377.7, 3],   // straight right to square 6
+  [97.4, sqCX(5), 377.7, 3],
+  [100.0, sqCX(6), 377.7, 3],  // straight right to square 7
 ];
 function camAt(t) {
   if (t <= CAM[0][0]) return CAM[0].slice(1);
@@ -369,11 +373,35 @@ function seq4(c, t) {
   if (t >= T.winnerBadge) { c.save(); c.fillStyle = '#efede4'; c.beginPath(); c.arc(w.x + 20, w.y - 22, 9.5, 0, Math.PI * 2); c.fill(); c.restore(); sym(c, 'check_circle', w.x + 20, w.y - 22, 22); }
   if (t >= T.winnerLabel) { setFont(c, 11, 800); c.letterSpacing = '.5px'; c.textAlign = 'center'; c.fillText('WINNING CONTRACTOR', w.x, w.y + 44); c.letterSpacing = '0px'; }
 }
-// ---------------- sequences 6 and 7: inspection, certificate of completion ----------------
+// ---------------- sequences 5, 6 and 7: construction, inspection, certificate of completion ----------------
 // Same grammar as squares 3 and 4: the icon fades in inside the square, then the heading hard-cuts in beneath it.
-// Both icons are solid composites drawn in the Material Symbols grid (960 units, origin bottom-left) so they match the
+// The icons are solid composites drawn in the Material Symbols grid (960 units, origin bottom-left) so they match the
 // filled handshake and assignment icons; the gaps are knockouts, so the real background shows through them.
 const COMPOSITE = {
+  construction(g) {       // tower crane lifting a concrete panel
+    const ko = f => { g.save(); g.globalCompositeOperation = 'destination-out'; f(); g.restore(); };
+    const tri = pts => { g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.closePath(); g.fill(); };
+    g.translate(-6, 32);  // centre the group in the grid
+    const m0 = 215, m1 = 375, mt = -725, mb = -175, mi = 28;                                        // mast: solid, with lattice openings
+    g.beginPath(); g.roundRect(m0, mt, m1 - m0, mb - mt, 10); g.fill();
+    ko(() => { const n = 4, h = (mb - mt - mi) / n; for (let k = 0; k < n; k++) { const y0 = mt + mi / 2 + k * h, y1 = y0 + h;
+        tri([[m0 + mi, y0 + mi * 1.7], [m0 + mi, y1 - mi * .5], [m1 - mi - 16, y1 - mi * .5]]);
+        tri([[m0 + mi + 16, y0 + mi * .5], [m1 - mi, y0 + mi * .5], [m1 - mi, y1 - mi * 1.7]]); } });
+    const jl = 90, jr = 890, jt = -825, jb = -725;                                                  // jib and counter-jib
+    g.beginPath(); g.roundRect(jl, jt, jr - jl, jb - jt, 12); g.fill();
+    ko(() => { for (let x = m1 + 26; x + 84 <= jr - 22; x += 92) tri([[x, jb - 20], [x + 42, jt + 20], [x + 84, jb - 20]]); });
+    tri([[m0 + 10, jt + 2], [295, -915], [m1 - 10, jt + 2]]);                                        // tower head and ties
+    g.lineCap = 'round'; g.lineWidth = 28; g.beginPath(); g.moveTo(jl + 30, jt - 6); g.lineTo(295, -900); g.lineTo(jr - 30, jt - 6); g.stroke();
+    g.beginPath(); g.roundRect(100, jb - 4, 115, 115, 14); g.fill();                                   // counterweight
+    g.beginPath(); g.roundRect(m1 - 4, jb - 4, 100, 95, 14); g.fill();                                 // cab, with a window
+    ko(() => { g.beginPath(); g.roundRect(m1 + 26, jb + 20, 48, 36, 6); g.fill(); });
+    const tx = 725;                                                                                  // trolley, cable, bridle, panel
+    g.beginPath(); g.roundRect(tx - 48, jb - 4, 96, 46, 12); g.fill();
+    g.lineWidth = 24; g.beginPath(); g.moveTo(tx, jb + 30); g.lineTo(tx, -505); g.stroke();
+    g.lineWidth = 26; g.lineJoin = 'round'; g.beginPath(); g.moveTo(tx - 125, -425); g.lineTo(tx, -505); g.lineTo(tx + 125, -425); g.stroke();
+    g.beginPath(); g.roundRect(tx - 160, -425, 320, 190, 20); g.fill();
+    g.beginPath(); g.roundRect(135, -180, 320, 64, 18); g.fill();                                     // base
+  },
   inspect(g) {            // magnifying glass over a checklist
     const ko = f => { g.save(); g.globalCompositeOperation = 'destination-out'; f(); g.restore(); };
     g.translate(-14, 0);  // centre the group in the grid
@@ -409,7 +437,10 @@ function composite(c, name, cx, cy, size, alpha) {
   knockLayer(c, g => { g.translate(cx, cy); g.scale(size / 960, size / 960); g.translate(-480, 480); COMPOSITE[name](g); }, alpha);
 }
 function stepHead(c, text, cx) { setFont(c, 15, 800); c.letterSpacing = '.6px'; c.textAlign = 'center'; c.fillText(text, cx, 524); c.letterSpacing = '0px'; c.textAlign = 'left'; }
-const C6 = sqCX(5), C7 = sqCX(6);
+const C5 = sqCX(4), C6 = sqCX(5), C7 = sqCX(6);
+function seq5(c, t) {
+  composite(c, 'construction', C5, SQ_CY, 140, pr(t, ...T.constructIn));
+}
 function seq6(c, t) {
   composite(c, 'inspect', C6, SQ_CY, 140, pr(t, ...T.inspectIn));
   if (t >= T.inspectHead) stepHead(c, 'INSPECTION', C6);
@@ -433,6 +464,7 @@ function drawMaster(t) {
   seq2(c, t);
   seq3(c, t);
   seq4(c, t);
+  seq5(c, t);
   seq6(c, t);
   seq7(c, t);
 }
