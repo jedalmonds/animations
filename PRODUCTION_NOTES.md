@@ -61,8 +61,8 @@ node check-seams.mjs --w 1280      # exits non-zero if any seam differs
   - **Certificate:** a certificate sheet with an inner border, text lines and a ribboned seal. The border is about
     the same weight as the square outlines.
 
-  Both still come from `icons.js` and `master.html`, so swapping back to a Material icon is a one-line change in
-  `seq6()` or `seq7()`.
+  The prepared Material paths stay in `icons.js`, so swapping back is a one-line change in `seq6()` or `seq7()`
+  (`sym(...)` in place of `composite(...)`).
 - **DPWH emblem:** simplified black-and-white gear, road and "DPWH" band, based on the approved infographic. It is
   **not** the official seal; swap in the official black-and-white logo if supplied.
 - **Reveal grammar:**
