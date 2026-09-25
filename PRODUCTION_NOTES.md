@@ -178,17 +178,17 @@ node check-seams.mjs --w 1280      # exits non-zero if any seam differs
    has the icon only, with no heading or supporting text.
 
 ## QA performed and its limits
-- The encoded 1–7 clip decodes fully: 97.02 s, 5,821 frames at 60 fps. The separate 6 and 7 clips each decode to
+- The encoded 1–7 clip decodes fully: 107.02 s, 6,421 frames at 60 fps. The separate 5, 6 and 7 clips each decode to
   601 frames (10.02 s).
-- The 1–4 section of the new clip was compared with the original 1–4 preview every second. The largest mean
-  difference is 0.7 of 255, from text anti-aliasing and compression.
-- In the encoded clip, "INSPECTION" (frame 4,950) and "CERTIFICATE OF COMPLETION" (frame 5,490) each appear in a
-  single frame, with no change in the frames on either side. A frame sheet of 76–97 s every 0.5 s was inspected.
-- Squares 6 and 7 were rendered in a Linux container (Chromium, same master). Stills of the unchanged 1–4 section
-  were compared with the Windows-rendered 1–4 preview; they differ only in text anti-aliasing and compression noise.
-- `check-seams.mjs`: all five seams (1→2, 2→3, 3→4, 4→6, 6→7) are byte-identical at 1280 wide.
-- Camera: peak screen speed per move, measured at 1920 wide, is 6–25 px per frame. The 4→6 pan peaks at 24.6 and 6→7
-  at 15.2, both within the range of the earlier pans (up to 25.2 on 2→3).
+- Squares 5–7 were rendered in a Linux container (Chromium, same master). The 1–4 section of the new clip was
+  compared with the Windows-rendered 1–4 preview every second: the largest mean difference is 0.7 of 255, from text
+  anti-aliasing and compression.
+- `check-seams.mjs`: all six seams (1→2, 2→3, 3→4, 4→5, 5→6, 6→7) are byte-identical at 1280 wide. Frames drawn in
+  forward and in reverse order across the whole film are identical.
+- In the encoded clip, "INSPECTION" (frame 5,490) and "CERTIFICATE OF COMPLETION" (frame 6,090) each appear in a
+  single frame, with no change in the frames on either side. A frame sheet of 76–107 s every 1 s was inspected.
+- Camera: peak screen speed per move, measured at 1920 wide, is 6–25 px per frame. The new pans peak at 20.5 (4→5)
+  and 15.2 (5→6 and 6→7), within the range of the earlier pans (up to 25.2 on 2→3).
 - Stills and frame sheets (every 0.5–1 s) were inspected, along with strips of the ₱ build and the pie build.
 - A numeric camera check found no speed discontinuities.
 - **Playback was not watched directly;** the review is based on extracted frames and camera maths.
