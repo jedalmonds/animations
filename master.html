@@ -1,0 +1,382 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Budget diagram master</title>
+<style>html,body{margin:0;background:#222}canvas{display:block;max-width:100vw;max-height:100vh}</style>
+<canvas id="c"></canvas>
+<script src="font.js"></script>
+<script src="icons.js"></script>
+<script>
+'use strict';
+// ONE MASTER CANVAS for the whole documentary diagram.
+// World units: the reference overview frame (1920 x 1080 at zoom 1). Output size never changes the layout.
+// Every sequence clip is a window of one continuous MASTER TIMELINE, so clip N's last frame is
+// identical to clip N+1's first frame (same camera, same visible elements).
+// Query: ?seq=1&w=1280&fps=60   (w = output width, 16:9)
+
+const qs = new URLSearchParams(location.search);
+const FPS = +qs.get('fps') || 60, OW = +qs.get('w') || 1280, OH = Math.round(OW * 9 / 16 / 2) * 2, K = OW / 1920;
+const SEQ = +qs.get('seq') || 1;
+const INK = '#141412', LW = 2.2;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v)), lerp = (a, b, u) => a + (b - a) * u;
+const pr = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const ease = u => { u = clamp(u, 0, 1); return u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; };   // gentle cubic in-out
+
+// ---------------- layout (world units) ----------------
+const SQ = 210, PITCH = 267, X0 = 57, SQ_TOP = 277;
+const sqX = k => X0 + k * PITCH, sqCX = k => sqX(k) + SQ / 2, SQ_CY = SQ_TOP + SQ / 2;
+const PIE = {x: sqCX(0), y: 665, r: 80};
+const SLICES = [.34, .22, .16, .12, .09, .07];                     // illustrative only, no labels
+const GREYS = ['#1b1b19', '#474641', '#72706a', '#9d9a92', '#c3c0b7', '#dcd9d0'];
+
+// ---------------- master timeline (seconds) ----------------
+// Sequence windows on the master clock. Later sequences are appended here.
+const SEQS = {1: {start: 0, dur: 17}, 2: {start: 17, dur: 24.5}, 3: {start: 41.5, dur: 18.5}, 4: {start: 60, dur: 17},
+  12: {start: 0, dur: 41.5}, 34: {start: 41.5, dur: 35.5}, 1234: {start: 0, dur: 77}};   // combined clips
+const T = {
+  peso: {trace: [4.3, 4.9], fill: [4.75, 5.25], bars: [5.1, 5.45, 5.2, 5.55]},   // outline traced, ink fills bottom-up, bars drawn across
+  arrow1: [9.2, 9.6],        // "large pool": arrow grows down from the square
+  circleIn: [10.6, 11.3],   // the circle is drawn in one continuous stroke
+  divide: [12.2, 12.7],      // dividers grow from the centre
+  sliceFill: [12.5, .12, .25],   // start, stagger per slice, fade per slice (clockwise)
+  separate: [13.4, 14.4],    // subtle outward separation, no rotation or bounce
+  // ---- sequence 2 (starts 17.0 on the final pie frame) ----
+  logoIn: [20.3, 20.9],      // same short graphic fade as the peso
+  deptName: 21.6,            // hard cut
+  respLabel: 24.7,           // small label above the list, same form as JOB:
+  items: [24.9, 25.5, 26.1, 26.7, 27.3, 27.9],   // hard cuts: left column top-down, then right; Flood Control last
+  etc: 28.8,
+  arrow2: [29.8, 30.2],
+  deoBox: 32.0,              // rectangle appears, then its title types in
+  deoType: [32.5, 33.8],
+  job: 35.6,
+  jobType: [35.9, 38.6],
+  // ---- sequence 3 (starts 41.5 on the finished district-office frame) ----
+  shakeIn: [45.2, 45.8],
+  budgetHead: 46.4,
+  projWords: [49.5, 49.75, 50.0, 50.25, 50.5],          // 220-METER REINFORCED / CONCRETE RIVER WALL
+  locWords: [51.2, 51.45, 51.7, 51.95],                 // Barangay Piel, Baliuag, Bulacan
+  rule3: [52.5, 52.8],
+  amount: 53.0,                                         // one complete item, no counting
+  projLabel: 49.3,                                      // added: PROPOSED PROJECT: label
+  wallIn: [55.2, 55.8],                                 // added: river-wall diagram
+  dimLine: [56.1, 56.6],                                // added: dimension line grows out from the centre
+  dimLabel: 56.8,                                       // added: "220 m" (hard cut)
+  // ---- sequence 4 (starts 56.5 on the project-details frame) ----
+  bidIconIn: [63.4, 64.0],
+  biddingHead: 64.6,
+  woman: [67.7, 68.1],
+  men: [68.5, 69.1, 69.7], suitorLine: .45,             // each man appears, then his dashed line draws toward her
+  winnerBadge: 73.3,
+  winnerLabel: 73.6,
+};
+const CAM = [   // [t, centreX, centreY, zoom]
+  [0, 960, 540, 1],
+  [1.0, 960, 540, 1],
+  [4.2, sqCX(0), 377.7, 3],
+  [9.2, sqCX(0), 377.7, 3],
+  [11.2, sqCX(0), 628, 3],
+  [17.4, sqCX(0), 628, 3],
+  [20.0, sqCX(1), 377.7, 3],   // to square 2: mostly horizontal, with the upward adjustment
+  [22.8, sqCX(1), 377.7, 3],
+  [24.6, sqCX(1), 600, 3],     // down to the infrastructure list
+  [30.2, sqCX(1), 600, 3],
+  [32.2, sqCX(1), 760, 3],     // down to the district office rectangle
+  [34.3, sqCX(1), 760, 3],
+  [35.5, sqCX(1), 812, 3],     // slightly further for JOB: and its task tiles
+  [41.9, sqCX(1), 812, 3],
+  [44.9, sqCX(2), 377.7, 3],   // to square 3
+  [47.4, sqCX(2), 377.7, 3],
+  [49.2, sqCX(2), 600, 3],     // down to the project details
+  [53.8, sqCX(2), 600, 3],
+  [55.0, sqCX(2), 662, 3],     // slightly down to the river-wall diagram
+  [60.4, sqCX(2), 662, 3],
+  [63.1, sqCX(3), 377.7, 3],   // to square 4
+  [65.6, sqCX(3), 377.7, 3],
+  [67.4, sqCX(3), 640, 3],     // down to the suitors
+];
+function camAt(t) {
+  if (t <= CAM[0][0]) return CAM[0].slice(1);
+  for (let i = 1; i < CAM.length; i++) if (t <= CAM[i][0]) {
+    const [t0, x0, y0, z0] = CAM[i - 1], [t1, x1, y1, z1] = CAM[i], u = ease((t - t0) / (t1 - t0));
+    return [lerp(x0, x1, u), lerp(y0, y1, u), Math.exp(lerp(Math.log(z0), Math.log(z1), u))];
+  }
+  return CAM.at(-1).slice(1);
+}
+
+// ---------------- background: screen-fixed warm gradient + very subtle grain ----------------
+let BG = null;
+function buildBG() {
+  BG = document.createElement('canvas'); BG.width = OW; BG.height = OH; const g = BG.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, OW, OH); gr.addColorStop(0, '#efede4'); gr.addColorStop(1, '#e3e0d7'); g.fillStyle = gr; g.fillRect(0, 0, OW, OH);
+  g.save(); g.globalAlpha = .018; g.fillStyle = '#fffdf5'; for (let i = 0; i < 9; i++) { g.beginPath(); const x = (i / 9) * OW * 1.3 - OW * .15; g.moveTo(x, 0); g.lineTo(x + OW * .06, 0); g.lineTo(x - OW * .28, OH); g.lineTo(x - OW * .34, OH); g.fill(); } g.restore();
+  const id = g.getImageData(0, 0, OW, OH), d = id.data; let s = 1234567;
+  const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+  for (let i = 0; i < d.length; i += 4) { const n = (rnd() - .5) * 5; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+  g.putImageData(id, 0, 0);
+}
+
+// ---------------- drawing primitives (world units) ----------------
+function hArrow(c, x0, x1, y) { c.lineWidth = LW; c.beginPath(); c.moveTo(x0, y); c.lineTo(x1 - 9, y); c.stroke(); c.beginPath(); c.moveTo(x1, y); c.lineTo(x1 - 11, y - 5.5); c.lineTo(x1 - 11, y + 5.5); c.closePath(); c.fill(); }
+function vArrow(c, x, y0, y1, p) {
+  if (p <= 0) return; const ye = lerp(y0, y1, p);
+  c.lineWidth = LW; c.beginPath(); c.moveTo(x, y0); c.lineTo(x, Math.max(y0, ye - 9)); c.stroke();
+  c.beginPath(); c.moveTo(x, ye); c.lineTo(x - 5.5, ye - 11); c.lineTo(x + 5.5, ye - 11); c.closePath(); c.fill();
+}
+function peso(c, cx, cy) {
+  c.save(); c.translate(cx, cy); c.beginPath();
+  // one outer contour (stem + bowl) and the counter as a second subpath
+  c.moveTo(-37.7, 49.7); c.lineTo(-37.7, -49.3); c.lineTo(5, -49.3); c.arc(5, -17.15, 32.15, -Math.PI / 2, Math.PI / 2); c.lineTo(-14.3, 15); c.lineTo(-14.3, 49.7); c.closePath();
+  c.moveTo(-14.3, -31); c.lineTo(-3, -31); c.arc(-3, -17.15, 13.85, -Math.PI / 2, Math.PI / 2); c.lineTo(-14.3, -3.3); c.closePath();
+  c.fill('evenodd');
+  c.fillRect(-45, -26.3, 89.7, 6.6); c.fillRect(-45, -14.3, 89.7, 6.6);    // double bar
+  c.restore();
+}
+const PESO_OUT = new Path2D('M-37.7 49.7 L-37.7 -49.3 L5 -49.3 A32.15 32.15 0 0 1 5 15 L-14.3 15 L-14.3 49.7 Z'), PESO_OUT_L = 320;
+const PESO_CTR = new Path2D('M-14.3 -31 L-3 -31 A13.85 13.85 0 0 1 -3 -3.3 L-14.3 -3.3 Z'), PESO_CTR_L = 94;
+// The peso builds itself: outline traced, ink fills from the bottom up, then the two bars are drawn across.
+function pesoBuild(c, cx, cy, t) {
+  const P = T.peso, a = ease(pr(t, ...P.trace)); if (a <= 0) return;
+  const f = ease(pr(t, ...P.fill)), b1 = ease(pr(t, P.bars[0], P.bars[1])), b2 = ease(pr(t, P.bars[2], P.bars[3]));
+  c.save(); c.translate(cx, cy); c.lineWidth = LW; c.lineJoin = 'miter'; c.lineCap = 'butt';
+  c.setLineDash([PESO_OUT_L * a, PESO_OUT_L + 5]); c.stroke(PESO_OUT);
+  c.setLineDash([PESO_CTR_L * a, PESO_CTR_L + 5]); c.stroke(PESO_CTR); c.setLineDash([]);
+  if (f > 0) { c.save(); c.beginPath(); c.rect(-60, 50 - 100 * f, 120, 100 * f); c.clip(); const p = new Path2D(); p.addPath(PESO_OUT); p.addPath(PESO_CTR); c.fill(p, 'evenodd'); c.restore(); }
+  if (b1 > 0) c.fillRect(-45, -26.3, 89.7 * b1, 6.6);
+  if (b2 > 0) c.fillRect(-45, -14.3, 89.7 * b2, 6.6);
+  c.restore();
+}
+function sym(c, name, cx, cy, size, alpha = 1) {
+  if (alpha <= 0) return; c.save(); c.globalAlpha *= alpha; c.translate(cx, cy); c.scale(size / 960, size / 960); c.translate(-480, 480); c.fill(new Path2D(MSYM[name])); c.restore();
+}
+// Word-by-word hard cuts: each line is laid out once (centred) so words never shift as others appear.
+function wordsLine(c, words, times, cx, y, t) {
+  const full = words.join(' '), x0 = cx - c.measureText(full).width / 2;
+  words.forEach((w, i) => { if (t >= times[i]) c.fillText(w, x0 + c.measureText(words.slice(0, i).join(' ') + (i ? ' ' : '')).width, y); });
+}
+function diagramRow(c) {
+  c.lineWidth = LW; c.lineJoin = 'miter';
+  c.font = `700 48px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  for (let k = 0; k < 7; k++) {
+    c.strokeRect(sqX(k), SQ_TOP, SQ, SQ);
+    c.fillText(String(k + 1), sqCX(k), 256);
+    if (k < 6) hArrow(c, sqX(k) + SQ + 9, sqX(k + 1) - 9, SQ_CY);
+  }
+}
+function pie(c, t) {
+  const sw = ease(pr(t, ...T.circleIn)); if (sw <= 0) return;
+  const dv = ease(pr(t, ...T.divide)), sep = 7 * ease(pr(t, ...T.separate)), inA = 1;
+  const [f0, fst, fd] = T.sliceFill, fillOf = i => pr(t, f0 + i * fst, f0 + i * fst + fd);
+  c.save(); c.lineWidth = LW; c.lineJoin = 'round'; c.lineCap = 'round';
+  if (dv <= 0) { c.beginPath(); c.arc(PIE.x, PIE.y, PIE.r, -Math.PI / 2, -Math.PI / 2 + sw * Math.PI * 2); c.stroke(); c.restore(); return; }
+  let a0 = -Math.PI / 2;
+  const wedges = SLICES.map((f, i) => { const a1 = a0 + f * Math.PI * 2, mid = (a0 + a1) / 2, w = {a0, a1, dx: Math.cos(mid) * sep, dy: Math.sin(mid) * sep, col: GREYS[i]}; a0 = a1; return w; });
+  for (const [i, w] of wedges.entries()) {           // grey fills, one slice after another
+    const fillA = fillOf(i); if (fillA <= 0) continue; c.save(); c.globalAlpha = inA * fillA; c.fillStyle = w.col;
+    c.beginPath(); c.moveTo(PIE.x + w.dx, PIE.y + w.dy); c.arc(PIE.x + w.dx, PIE.y + w.dy, PIE.r, w.a0, w.a1); c.closePath(); c.fill(); c.restore();
+  }
+  for (const w of wedges) {           // outlines: rim + dividers that grow from the centre
+    const cx = PIE.x + w.dx, cy = PIE.y + w.dy;
+    c.beginPath(); c.arc(cx, cy, PIE.r, w.a0, w.a1); c.stroke();
+    c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(w.a0) * PIE.r * dv, cy + Math.sin(w.a0) * PIE.r * dv); c.stroke();
+    if (sep > 0) { c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(w.a1) * PIE.r, cy + Math.sin(w.a1) * PIE.r); c.stroke(); }
+  }
+  c.restore();
+}
+
+// ---------------- sequence 2 elements ----------------
+const C2 = sqCX(1);
+const LIST = {lx: 296, rx: 452, y0: 582, dy: 25, size: 13,
+  left: ['Roads', 'Bridges', 'Water Resources'], right: ['Public Buildings', 'School Buildings', 'Flood Control']};
+const DEO = {x: C2 - 150, y: 725, w: 300, h: 50, title: 'DISTRICT ENGINEERING OFFICE'};
+// Task tiles under JOB: each appears (hard cut) the moment the typing reaches its phrase.
+const TASKS = {y: 884, size: 46, gap: 32, list: [['magnify', 'Identify local needs'], ['blueprint', 'plan and design infrastructure'], ['clipboard', 'Manage assigned projects'], ['hardhat', 'quality and progress']]};
+const JOB = {x: DEO.x, y: 812, size: 11.5, lh: 17, maxW: 300,
+  paras: ['Identify local needs; plan and design infrastructure.', 'Manage assigned projects and check construction quality and progress.']};
+// Small flat icons (world units, ~16 wide, centred on x,y). Drawn with the same ink and line weight family.
+const ICON = {
+  road(c) { c.beginPath(); c.moveTo(-7, 7); c.lineTo(-1.6, -7); c.lineTo(1.6, -7); c.lineTo(7, 7); c.closePath(); c.fill();
+    c.save(); c.globalCompositeOperation = 'destination-out'; c.fillRect(-.5, -4.5, 1, 2.4); c.fillRect(-.7, -.6, 1.4, 3); c.fillRect(-.9, 3.8, 1.8, 3.2); c.restore(); },
+  bridge(c) { c.fillRect(-8, -3.5, 16, 2.2); c.lineWidth = 1.5; c.beginPath(); c.arc(0, 6.5, 7, Math.PI, 0); c.stroke();
+    for (const x of [-3.5, 0, 3.5]) c.fillRect(x - .5, -1.3, 1, 2.6 + (Math.abs(x) > 1 ? 1.4 : 0)); c.fillRect(-8, -1.3, 1.6, 8); c.fillRect(6.4, -1.3, 1.6, 8); },
+  water(c) { c.beginPath(); c.moveTo(0, -8); c.bezierCurveTo(1.5, -4.5, 6, -1, 6, 2.5); c.arc(0, 2.5, 6, 0, Math.PI); c.bezierCurveTo(-6, -1, -1.5, -4.5, 0, -8); c.fill(); },
+  publicBuilding(c) { c.beginPath(); c.moveTo(-8, -3.2); c.lineTo(0, -8); c.lineTo(8, -3.2); c.closePath(); c.fill();
+    for (const x of [-6, -2, 2, 6]) c.fillRect(x - .9, -2.2, 1.8, 7.4); c.fillRect(-8, 5.6, 16, 2); },
+  school(c) { c.beginPath(); c.moveTo(-7.5, -1); c.lineTo(0, -6); c.lineTo(7.5, -1); c.lineTo(7.5, 8); c.lineTo(-7.5, 8); c.closePath(); c.fill();
+    c.fillRect(-.5, -12, 1, 6.5); c.beginPath(); c.moveTo(.5, -12); c.lineTo(5, -10.6); c.lineTo(.5, -9.2); c.fill();
+    c.save(); c.globalCompositeOperation = 'destination-out'; c.fillRect(-1.6, 3, 3.2, 5); c.fillRect(-5.5, 1, 2.6, 2.4); c.fillRect(2.9, 1, 2.6, 2.4); c.restore(); },
+  flood(c) { c.beginPath(); c.moveTo(1, -8); c.lineTo(7.5, -8); c.lineTo(7.5, 8); c.lineTo(-1, 8); c.closePath(); c.fill();
+    c.lineWidth = 1.3; for (const y of [-2, 2, 6]) { c.beginPath(); c.moveTo(-8.5, y); c.quadraticCurveTo(-6.8, y - 1.6, -5, y); c.quadraticCurveTo(-3.2, y + 1.6, -1.5, y); c.stroke(); } },
+  magnify(c) { c.lineWidth = 2.2; c.beginPath(); c.arc(-2, -2, 6, 0, Math.PI * 2); c.stroke(); c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(2.6, 2.6); c.lineTo(8, 8); c.stroke();
+    c.beginPath(); c.moveTo(-2, -5.5); c.bezierCurveTo(-4.8, -5.5, -4.8, -2, -2, 1); c.bezierCurveTo(.8, -2, .8, -5.5, -2, -5.5); c.fill(); c.save(); c.globalCompositeOperation = 'destination-out'; c.beginPath(); c.arc(-2, -3.6, .9, 0, Math.PI * 2); c.fill(); c.restore(); },
+  blueprint(c) { c.lineWidth = 1.4; c.strokeRect(-8, -7, 13, 15); c.lineWidth = .6; c.beginPath(); for (const v of [-4.5, -1, 2.5]) { c.moveTo(v, -7); c.lineTo(v, 8); } for (const v of [-3, 1, 5]) { c.moveTo(-8, v); c.lineTo(5, v); } c.stroke();
+    c.save(); c.translate(3.5, .5); c.rotate(-.8); c.fillRect(0, -1.6, 9, 3.2); c.beginPath(); c.moveTo(0, -1.6); c.lineTo(-3.2, 0); c.lineTo(0, 1.6); c.fill(); c.restore(); },
+  clipboard(c) { c.lineWidth = 1.6; c.strokeRect(-6.5, -6, 13, 15); c.fillRect(-3, -8.5, 6, 3.4);
+    c.lineWidth = 1.2; c.lineCap = 'round'; for (const y of [-1.5, 2.5, 6]) { c.beginPath(); c.moveTo(-4.4, y); c.lineTo(-3.4, y + 1); c.lineTo(-1.8, y - 1); c.stroke(); c.fillRect(0, y - .5, 4.4, 1.1); } },
+  hardhat(c) { c.beginPath(); c.moveTo(-7, 1); c.bezierCurveTo(-7, -7.5, 5, -7.5, 5, 1); c.closePath(); c.fill(); c.fillRect(-8.5, .6, 15, 2);
+    c.save(); c.globalCompositeOperation = 'destination-out'; c.fillRect(-1.6, -6, 1.2, 6); c.restore();
+    c.lineWidth = 1.8; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); c.moveTo(2, 6); c.lineTo(4.4, 8.4); c.lineTo(8.6, 3.6); c.stroke(); },
+  office(c) { c.fillRect(-7, -6, 14, 14); c.fillRect(-8, -7.6, 16, 2); c.fillRect(5, -12, .9, 5); c.beginPath(); c.moveTo(5.9, -12); c.lineTo(9.5, -11); c.lineTo(5.9, -10); c.fill();
+    c.save(); c.globalCompositeOperation = 'destination-out'; for (const [x, y] of [[-5, -3.5], [-1, -3.5], [3, -3.5], [-5, .5], [3, .5]]) c.fillRect(x, y, 2.2, 2.2); c.fillRect(-1.1, 2.5, 2.2, 5.5); c.restore(); },
+};
+const LIST_ICONS = {Roads: 'road', Bridges: 'bridge', 'Water Resources': 'water', 'Public Buildings': 'publicBuilding', 'School Buildings': 'school', 'Flood Control': 'flood'};
+// Icons with knockouts are drawn through a scratch layer so the real background shows through.
+let ICON_L = null;
+function icon(c, name, x, y, s = 1) {
+  if (!ICON_L) { ICON_L = document.createElement('canvas'); ICON_L.width = ICON_L.height = 256; }
+  const g = ICON_L.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 256, 256);
+  g.setTransform(256 / 26, 0, 0, 256 / 26, 128, 128); g.fillStyle = INK; g.strokeStyle = INK; g.lineCap = 'butt'; ICON[name](g);
+  c.drawImage(ICON_L, x - 13 * s, y - 13 * s, 26 * s, 26 * s);
+}
+function setFont(c, size, weight) { c.font = `${weight} ${size}px ${FONT}`; }
+function wrap(c, text, maxW) { const out = []; let line = ''; for (const w of text.split(' ')) { const tryL = line ? line + ' ' + w : w; if (c.measureText(tryL).width > maxW && line) { out.push(line); line = w; } else line = tryL; } out.push(line); return out; }
+// Black-and-white DPWH emblem, built once in an offscreen canvas so knockouts show the real background.
+let LOGO = null; const LOGO_R = 80, LOGO_PX = 1400;
+function buildLogo() {
+  LOGO = document.createElement('canvas'); LOGO.width = LOGO.height = LOGO_PX; const g = LOGO.getContext('2d');
+  g.translate(LOGO_PX / 2, LOGO_PX / 2); g.scale(LOGO_PX / (2 * LOGO_R + 4), LOGO_PX / (2 * LOGO_R + 4)); g.fillStyle = INK; g.strokeStyle = INK;
+  g.beginPath(); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; for (const [da, r] of [[-.262, 70], [-.15, 80], [.15, 80], [.262, 70]]) g.lineTo(Math.cos(a + da) * r, Math.sin(a + da) * r); } g.closePath(); g.fill();
+  const ko = f => { g.save(); g.globalCompositeOperation = 'destination-out'; f(); g.restore(); };
+  ko(() => { g.beginPath(); g.arc(0, 0, 63, 0, Math.PI * 2); g.fill(); });
+  g.beginPath(); g.arc(0, 0, 57, 0, Math.PI * 2); g.fill();
+  g.save(); g.beginPath(); g.arc(0, 0, 57, 0, Math.PI * 2); g.clip();
+  ko(() => { g.fillRect(-60, -17, 120, 34);
+    g.lineCap = 'butt'; g.lineWidth = 3; g.beginPath(); g.moveTo(-30, 58); g.lineTo(-5, 21); g.moveTo(30, 58); g.lineTo(5, 21); g.stroke();
+    for (const [y0, y1, w] of [[26, 32, 1.6], [37, 45, 2.2], [50, 58, 2.8]]) { g.lineWidth = w; g.beginPath(); g.moveTo(0, y0); g.lineTo(0, y1); g.stroke(); }
+    g.lineWidth = 1.2; g.beginPath(); g.arc(0, 0, 51, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); });
+  g.fillRect(-57, -14, 114, 1.6); g.fillRect(-57, 12.4, 114, 1.6);
+  setFont(g, 25, 800); g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.letterSpacing = '1px'; g.fillText('DPWH', 0, 9);
+  g.restore();
+}
+function seq2(c, t) {
+  const la = pr(t, ...T.logoIn);
+  if (la > 0) { if (!LOGO) buildLogo(); c.save(); c.globalAlpha = la; const d = 2 * LOGO_R + 4; c.drawImage(LOGO, C2 - d / 2, SQ_CY - d / 2, d, d); c.restore(); }
+  c.textBaseline = 'alphabetic';
+  if (t >= T.deptName) { setFont(c, 12, 400); c.textAlign = 'center'; c.fillText('Department of Public Works and Highways', C2, 522); }
+  setFont(c, LIST.size, 600); c.textAlign = 'left';
+  const cols = [[LIST.lx, LIST.left], [LIST.rx, LIST.right]]; let k = 0;
+  if (t >= T.respLabel) { setFont(c, 10.5, 700); c.letterSpacing = '.6px'; c.fillText('RESPONSIBLE FOR:', LIST.lx - 20, 556); c.letterSpacing = '0px'; setFont(c, LIST.size, 600); }
+  for (const [x, items] of cols) items.forEach((s, r) => { if (t >= T.items[k++]) { const y = LIST.y0 + r * LIST.dy; icon(c, LIST_ICONS[s], x - 12, y - 4.6, .95); c.fillText(s, x, y); } });
+  if (t >= T.etc) { setFont(c, 11, 400); c.fillText('etc.', LIST.lx, LIST.y0 + 3 * LIST.dy - 3); }
+  vArrow(c, C2, 668, 712, ease(pr(t, ...T.arrow2)));
+  if (t >= T.deoBox) {
+    c.lineWidth = LW; c.strokeRect(DEO.x, DEO.y, DEO.w, DEO.h);
+    setFont(c, 13, 700); c.letterSpacing = '.5px'; const full = c.measureText(DEO.title).width, n = Math.floor(DEO.title.length * pr(t, ...T.deoType));
+    const gx = C2 - (full + 28) / 2;                                  // icon + title centred as one group
+    icon(c, 'office', gx + 9, DEO.y + DEO.h / 2 - .5, 1.05);
+    c.textAlign = 'left'; if (n > 0) c.fillText(DEO.title.slice(0, n), gx + 28, DEO.y + DEO.h / 2 + 4.6); c.letterSpacing = '0px';   // left edge fixed while typing
+  }
+  if (t >= T.job) {
+    setFont(c, 12, 700); c.textAlign = 'left'; c.fillText('JOB:', JOB.x, JOB.y);
+    setFont(c, JOB.size, 400); const lines = JOB.paras.flatMap(p => wrap(c, p, JOB.maxW)), total = lines.reduce((a, l) => a + l.length, 0);
+    let left = Math.floor(total * pr(t, ...T.jobType));
+    const typed = left, flat = JOB.paras.join(' ');
+    lines.forEach((l, i) => { if (left <= 0) return; c.fillText(l.slice(0, left), JOB.x, JOB.y + 20 + i * JOB.lh); left -= l.length; });
+    // wrapped lines drop the spaces between them, so phrase ends are counted on the space-free text
+    const noSp = str => str.replace(/ /g, '').length, typedNoSp = noSp(lines.join('').slice(0, typed));
+    TASKS.list.forEach(([ic, phrase], k) => {
+      const endAt = noSp(flat.slice(0, flat.indexOf(phrase) + phrase.length)); if (typedNoSp < endAt) return;
+      const x = JOB.x + k * (TASKS.size + TASKS.gap), y = TASKS.y;
+      c.lineWidth = 1.6; c.strokeRect(x, y, TASKS.size, TASKS.size); icon(c, ic, x + TASKS.size / 2, y + TASKS.size / 2, 1.3);
+      if (k > 0) hArrow(c, x - TASKS.gap + 6, x - 6, y + TASKS.size / 2);
+    });
+  }
+}
+
+// Draws fn under the current transform into a full-frame scratch layer, so destination-out knockouts reveal the real background.
+let KO_L = null;
+function knockLayer(c, fn) {
+  if (!KO_L) { KO_L = document.createElement('canvas'); KO_L.width = OW; KO_L.height = OH; }
+  const g = KO_L.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(0, 0, OW, OH);
+  g.setTransform(c.getTransform()); g.fillStyle = INK; g.strokeStyle = INK; fn(g);
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.drawImage(KO_L, 0, 0); c.restore();
+}
+// River wall in perspective, panels as knocked-out joints, water on the river side (same language as the infographic).
+const WALL = {x0: 648, x1: 792, top0: 690, top1: 702, bot0: 752, bot1: 736};
+function riverWall(c, a) {
+  if (a <= 0) return;
+  knockLayer(c, g => {
+    g.globalAlpha = a;
+    g.beginPath(); g.moveTo(WALL.x0, WALL.top0); g.lineTo(WALL.x1, WALL.top1); g.lineTo(WALL.x1, WALL.bot1); g.lineTo(WALL.x0, WALL.bot0); g.closePath(); g.fill();
+    g.fillRect(WALL.x0 - 6, WALL.top0, 6, WALL.bot0 - WALL.top0);                              // near face
+    g.save(); g.globalCompositeOperation = 'destination-out'; g.lineWidth = 1.3;
+    for (let k = 1; k < 7; k++) { const u = Math.pow(k / 7, .9), x = lerp(WALL.x0, WALL.x1, u); g.beginPath(); g.moveTo(x, lerp(WALL.top0, WALL.top1, u) + 3); g.lineTo(x, lerp(WALL.bot0, WALL.bot1, u) - 2); g.stroke(); }
+    g.lineWidth = 1; g.beginPath(); g.moveTo(WALL.x0 + 1, WALL.top0 + 5); g.lineTo(WALL.x1 - 1, WALL.top1 + 4.5); g.stroke(); g.restore();
+    g.lineWidth = 2; g.lineCap = 'round';
+    for (const [y, x0] of [[712, 604], [726, 600], [740, 604]]) { g.beginPath(); g.moveTo(x0, y); for (let x = x0; x <= WALL.x0 - 10; x += 2) g.lineTo(x, y + Math.sin((x - x0) / 5.2) * 2.2); g.stroke(); }
+    g.lineWidth = 1.4; g.beginPath(); g.moveTo(WALL.x1 + 2, WALL.bot1); g.lineTo(WALL.x1 + 22, WALL.bot1); g.stroke();   // dry ground behind the wall
+  });
+}
+function dimension(c, t) {
+  const p = ease(pr(t, ...T.dimLine)); if (p <= 0) return;
+  const y = 770, cx = (WALL.x0 + WALL.x1) / 2, half = (WALL.x1 - WALL.x0 + 6) / 2 * p;
+  c.lineWidth = 1.2; c.beginPath(); c.moveTo(cx - half, y); c.lineTo(cx + half, y); c.stroke();
+  if (p >= 1) for (const [x, d] of [[cx - half, 1], [cx + half, -1]]) { c.beginPath(); c.moveTo(x, y - 6); c.lineTo(x, y + 6); c.stroke(); c.beginPath(); c.moveTo(x, y); c.lineTo(x + d * 7, y - 3.2); c.lineTo(x + d * 7, y + 3.2); c.closePath(); c.fill(); }
+  if (t >= T.dimLabel) { setFont(c, 11, 800); c.textAlign = 'center'; c.letterSpacing = '.4px'; c.fillText('220 m', cx, y + 18); c.letterSpacing = '0px'; c.textAlign = 'left'; }
+}
+// ---------------- sequence 3: budget approval ----------------
+const C3 = sqCX(2);
+function seq3(c, t) {
+  sym(c, 'handshake', C3, SQ_CY + 2, 150, pr(t, ...T.shakeIn));
+  c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+  if (t >= T.budgetHead) { setFont(c, 15, 800); c.letterSpacing = '.6px'; c.textAlign = 'center'; c.fillText('BUDGET APPROVAL', C3, 524); c.letterSpacing = '0px'; c.textAlign = 'left'; }
+  if (t >= T.projLabel) { setFont(c, 10.5, 700); c.letterSpacing = '.6px'; c.textAlign = 'center'; c.fillText('PROPOSED PROJECT:', C3, 549); c.textAlign = 'left'; }
+  setFont(c, 13, 700); c.letterSpacing = '.4px';
+  wordsLine(c, ['220-METER', 'REINFORCED'], T.projWords.slice(0, 2), C3, 570, t);
+  wordsLine(c, ['CONCRETE', 'RIVER', 'WALL'], T.projWords.slice(2), C3, 589, t);
+  c.letterSpacing = '0px'; setFont(c, 11, 400);
+  const locW = c.measureText('Barangay Piel, Baliuag, Bulacan').width;
+  if (t >= T.locWords[0]) sym(c, 'location_on', C3 - 6 - locW / 2 - 1, 607, 15);      // pin arrives with the first word
+  wordsLine(c, ['Barangay', 'Piel,', 'Baliuag,', 'Bulacan'], T.locWords, C3 + 6, 611, t);
+  const rp = ease(pr(t, ...T.rule3)); if (rp > 0) { c.lineWidth = 1.2; c.beginPath(); c.moveTo(C3 - 80, 627); c.lineTo(C3 - 80 + 160 * rp, 627); c.stroke(); }
+  if (t >= T.amount) {                                   // vector peso sign + figure, centred as one group
+    setFont(c, 21, 800); const num = '55,739,911.60', nw = c.measureText(num).width, ps = .15, gw = 90 * ps + 3 + nw, x0 = C3 - gw / 2;
+    c.save(); c.translate(x0 + 45 * ps, 657 - 7.6); c.scale(ps, ps); peso(c, 0, 0); c.restore(); c.fillText(num, x0 + 90 * ps + 3, 657);
+  }
+  riverWall(c, pr(t, ...T.wallIn));
+  dimension(c, t);
+}
+// ---------------- sequence 4: bidding ----------------
+const C4 = sqCX(3);
+const WOMAN = {x: C4 - 12, y: 588, size: 62}, HOUSE = {x: C4 + 36, y: 596, size: 40};
+const MEN = [C4 - 78, C4, C4 + 78].map(x => ({x, y: 718, size: 56}));
+function seq4(c, t) {
+  sym(c, 'assignment', C4, SQ_CY, 140, pr(t, ...T.bidIconIn));
+  if (t >= T.biddingHead) { setFont(c, 15, 800); c.letterSpacing = '.6px'; c.textAlign = 'center'; c.fillText('BIDDING', C4, 524); c.letterSpacing = '0px'; }
+  const wa = pr(t, ...T.woman); sym(c, 'woman', WOMAN.x, WOMAN.y, WOMAN.size, wa); sym(c, 'home', HOUSE.x, HOUSE.y, HOUSE.size, wa);
+  MEN.forEach((m, i) => {
+    if (t < T.men[i]) return; sym(c, 'man', m.x, m.y, m.size);
+    const p = ease(pr(t, T.men[i] + .15, T.men[i] + .15 + T.suitorLine)); if (p <= 0) return;
+    const a = [m.x, m.y - 30], b = [WOMAN.x + (m.x - WOMAN.x) * .25, WOMAN.y + 34], e = [lerp(a[0], b[0], p), lerp(a[1], b[1], p)];
+    c.save(); c.lineWidth = 1.4; c.setLineDash([4, 3.5]); c.beginPath(); c.moveTo(...a); c.lineTo(...e); c.stroke(); c.restore();
+    if (p >= 1) { const ang = Math.atan2(b[1] - a[1], b[0] - a[0]); c.beginPath(); c.moveTo(...b); c.lineTo(b[0] - Math.cos(ang - .5) * 6, b[1] - Math.sin(ang - .5) * 6); c.lineTo(b[0] - Math.cos(ang + .5) * 6, b[1] - Math.sin(ang + .5) * 6); c.closePath(); c.fill(); }
+  });
+  const w = MEN[2];
+  if (t >= T.winnerBadge) { c.save(); c.fillStyle = '#efede4'; c.beginPath(); c.arc(w.x + 20, w.y - 22, 9.5, 0, Math.PI * 2); c.fill(); c.restore(); sym(c, 'check_circle', w.x + 20, w.y - 22, 22); }
+  if (t >= T.winnerLabel) { setFont(c, 11, 800); c.letterSpacing = '.5px'; c.textAlign = 'center'; c.fillText('WINNING CONTRACTOR', w.x, w.y + 44); c.letterSpacing = '0px'; }
+}
+
+// ---------------- frame ----------------
+const cv = document.getElementById('c'); cv.width = OW; cv.height = OH; const ctx = cv.getContext('2d');
+function drawMaster(t) {
+  const c = ctx; c.setTransform(1, 0, 0, 1, 0, 0); if (!BG) buildBG(); c.drawImage(BG, 0, 0);
+  const [x, y, z] = camAt(t);
+  c.setTransform(K * z, 0, 0, K * z, OW / 2 - x * K * z, OH / 2 - y * K * z);
+  c.fillStyle = INK; c.strokeStyle = INK;
+  diagramRow(c);
+  pesoBuild(c, sqCX(0), SQ_CY, t);
+  vArrow(c, sqCX(0), 500, 572, ease(pr(t, ...T.arrow1)));
+  pie(c, t);
+  seq2(c, t);
+  seq3(c, t);
+  seq4(c, t);
+}
+const S0 = SEQS[SEQ], N = Math.round(S0.dur * FPS) + 1;       // +1: the last frame lands exactly on the sequence end
+window.__NDRAW = N; window.__fps = FPS;
+window.__frame = i => { drawMaster(S0.start + i / FPS); return cv.toDataURL('image/png'); };
+FONT_READY.then(() => document.fonts.ready).then(() => {
+  if (qs.has('render')) {}
+  else if (qs.has('frame')) drawMaster(S0.start + +qs.get('frame') / FPS);
+  else { let st = performance.now(); const loop = () => { const t = ((performance.now() - st) / 1000) % S0.dur; drawMaster(S0.start + t); requestAnimationFrame(loop); }; loop(); }
+  window.__ready = true;
+});
+</script>
