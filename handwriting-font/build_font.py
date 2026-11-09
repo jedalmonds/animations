@@ -229,32 +229,82 @@ FAMILY = 'Julia Age 3'
 PS_NAME = 'JuliaAge3-Regular'
 VERSION = '1.000'
 UPM = 1000
-CAP_HEIGHT = 700      # font units for her median capital letter; everything else keeps its drawn size
+CAP_HEIGHT = 700      # font units for her median capital letter
 SIDEBEARING = 55      # font units of space on each side of every glyph
 SPACE = 300
 
-# These hang below the baseline by what she drew, or at least this share of their height.
-# (At three she mostly wrote them on the line, which makes running text hard to read.)
-DESCENDERS = {'g': .30, 'j': .30, 'p': .30, 'q': .30, 'y': .30}
+# How far to even out her letters: 0 keeps them exactly as drawn, 1 makes every letter of a
+# kind the same height and puts every letter exactly on the line. Partway keeps them hand-drawn.
+ALIGN = 0.8
+
+# Each letter's height moves ALIGN of the way (in proportion) to the median height of its kind,
+# measured on her own letters.
+KINDS = {
+    'cap': 'ABCDEFGHIJKLMNOPRSTUVWXYZ?!%&',
+    'digit': '0123456789',
+    'x': 'acemnorsuvwxz',
+    'tall': 'bdfhkli',
+}
+DESC_DEPTH = 0.4      # g j p q y hang this share of her x-height below the line
+                      # (at three she mostly wrote them sitting on the line)
 
 
-def drops(glyphs):
-    """How far each glyph's lowest point sits below the baseline, in photo pixels.
+def stroke_px(bmp):
+    """Marker width of a glyph bitmap in its own pixels: for a long stroke, 2 * area / perimeter."""
+    cs, _ = cv2.findContours(bmp, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    return 2 * bmp.sum() / sum(cv2.arcLength(c, True) for c in cs)
 
-    Each row's baseline is the median bottom of its letters; every letter that is not a
-    descender is then set straight on the baseline.
+
+def rescale(bmp, s):
+    """Resize a glyph by s, keeping its marker stroke as thick as she drew it."""
+    w = stroke_px(bmp)
+    soft = cv2.GaussianBlur(bmp.astype(np.float32), (0, 0), 1.5)
+    m = np.pad((cv2.resize(soft, None, fx=s, fy=s, interpolation=cv2.INTER_LINEAR) >= 0.5).astype(np.uint8), 40)
+    r = int(round(abs(s - 1) * w / 2))
+    if r >= 1:
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+        m = cv2.erode(m, k) if s > 1 else cv2.dilate(m, k)
+    return crop(m)
+
+
+def even_out(glyphs):
+    """Bring her letters toward common heights and onto a common baseline, ALIGN of the way.
+
+    Returns the resized glyphs and, for each, how far its lowest point sits below the
+    baseline (photo pixels).
     """
-    skip = set(DESCENDERS) | set(':;.,')
-    base = {r: np.median([glyphs[ch]['bottom'] for ch in row if ch not in skip]) for r, row in enumerate(ROWS)}
-    d = {}
+    H = {ch: g['bottom'] - g['top'] for ch, g in glyphs.items()}
+    med = {k: float(np.median([H[c] for c in v])) for k, v in KINDS.items()}
+    cap, xh, tall = med['cap'], med['x'], med['tall']
+    want = {c: med[k] for k, v in KINDS.items() for c in v}
+    hang = {}                                   # letters placed by their top rather than their bottom
+    want['t'] = xh + 0.6 * (tall - xh)          # t's cross reaches above the x-height, not to the top
+    for c in 'gpqy':
+        want[c], hang[c] = xh + DESC_DEPTH * xh, xh
+    want['j'], hang['j'] = tall + DESC_DEPTH * xh, tall
+    want['Q'], hang['Q'] = cap * H['Q'] / H['O'], cap      # her Q is her O plus a tail below the line
+
+    # The line she wrote on: each row's median bottom.
+    skip = set('gjpqy:;.,')
+    base = {r: np.median([glyphs[c]['bottom'] for c in row if c not in skip]) for r, row in enumerate(ROWS)}
+    out, drop = {}, {}
     for ch, g in glyphs.items():
-        h = g['bottom'] - g['top']
-        d[ch] = max(g['bottom'] - base[g['row']], DESCENDERS[ch] * h) if ch in DESCENDERS else 0.0
+        if ch not in want:                      # . , : ; stay as drawn
+            out[ch], drop[ch] = g, 0.0
+            continue
+        ng = out[ch] = bitmap_glyph(rescale(g['bmp'], (want[ch] / H[ch]) ** ALIGN))
+        h = ng['bottom'] - ng['top']
+        if ch in hang:
+            drop[ch] = h - hang[ch]
+            if ch in 'gjpqy':
+                drop[ch] = max(drop[ch], 0.2 * h)
+        else:                                   # keep a little of her own bounce
+            drop[ch] = (1 - ALIGN) * (g['bottom'] - base[g['row']])
     # '.' and ':' sit on the baseline. ';' keeps the drop she drew below her ':', and ','
     # hangs so that its top lines up with the top of her '.'.
-    d[';'] = glyphs[';']['bottom'] - glyphs[':']['bottom']
-    d[','] = (glyphs[',']['bottom'] - glyphs[',']['top']) - (glyphs['.']['bottom'] - glyphs['.']['top'])
-    return d
+    drop[';'] = glyphs[';']['bottom'] - glyphs[':']['bottom']
+    drop[','] = (glyphs[',']['bottom'] - glyphs[',']['top']) - (glyphs['.']['bottom'] - glyphs['.']['top'])
+    return out, drop, cap
 
 
 def bitmap_glyph(bmp):
@@ -431,11 +481,9 @@ def notdef():
 
 def build_outlines():
     glyphs = extract_all()
-    dr = drops(glyphs)
-    caps = [glyphs[ch]['bottom'] - glyphs[ch]['top'] for ch in ROWS[0] + ROWS[1] + ROWS[2][:6]]
-    cap_px = float(np.median(caps))
+    even, dr, cap_px = even_out(glyphs)
     scale = CAP_HEIGHT / cap_px
-    source = {NAMES.get(ch, ch): (ch, g) for ch, g in glyphs.items()}
+    source = {NAMES.get(ch, ch): (ch, g) for ch, g in even.items()}
     for name, g in extra_glyphs(glyphs, dr, cap_px).items():
         source[name] = (name, g)
     outlines = {'.notdef': notdef(), 'space': (RecordingPen(), SPACE)}
