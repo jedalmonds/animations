@@ -1,2 +1,4 @@
 node_modules/
 out/
+handwriting-font/build/
+__pycache__/
